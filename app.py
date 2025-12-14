@@ -1,4 +1,4 @@
-# --- Gemi.py ---
+
 
 import streamlit as st
 import pandas as pd
@@ -24,17 +24,16 @@ from google.genai.errors import APIError
 scheduler = BackgroundScheduler()
 scheduler.start()
 
-# --- Placeholder/Initialization for Gemini Client ---
 client = None
 
-# --- UPDATED send_reminder_email FUNCTION ---
+#  send_reminder_email FUNCTION ---
 
 def send_reminder_email(user_email, plant, date, time_str, base_qty_str, temp_c, percent_adj, final_qty_ml, temp_category, percent_category):
     """
     Send reminder email including Fuzzy Logic calculation details and categories.
     """
     
-    # Format the fuzzy logic variables for the email body
+    #fuzzy logic variables for the email body
     temp_display = f"{temp_c:.1f} °C" if temp_c is not None else "N/A (Fetch Failed)"
     percent_display = f"{percent_adj:+.2f}%"
     final_qty_display = f"{final_qty_ml:.0f} mL"
@@ -44,7 +43,7 @@ def send_reminder_email(user_email, plant, date, time_str, base_qty_str, temp_c,
     percent_cat_display = f"({percent_category})"
     
     try:
-        # NOTE: REPLACE THESE WITH YOUR ACTUAL GMAIL AND APP PASSWORD
+        #GMAIL AND APP PASSWORD
         sender_email = "plantwateringremainder@gmail.com"        
         sender_password = "egbr wiiv xzye mrgo"       # Gmail app password (NOT your regular password)
 
@@ -91,7 +90,7 @@ def send_reminder_email(user_email, plant, date, time_str, base_qty_str, temp_c,
         Remember to check your soil before watering!
         """
         
-        # Use MIMEMultipart to send both HTML and plain text
+        # Used MIMEMultipart to send both HTML and plain text
         from email.mime.multipart import MIMEMultipart
         message = MIMEMultipart("alternative")
         
@@ -100,7 +99,7 @@ def send_reminder_email(user_email, plant, date, time_str, base_qty_str, temp_c,
         message['To'] = user_email
         
         message.attach(MIMEText(plain_body, 'plain'))
-        message.attach(MIMEText(html_body, 'html')) # Attach HTML version
+        message.attach(MIMEText(html_body, 'html')) 
 
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(sender_email, sender_password)
@@ -110,8 +109,7 @@ def send_reminder_email(user_email, plant, date, time_str, base_qty_str, temp_c,
     except Exception as e:
         print(f"Error sending email: {e}")
 
-# Note: You must ensure you use the full import for MIMEMultipart at the top of Gemi.py:
-# from email.mime.multipart import MIMEMultipart
+
 
 # -------------------- Email Validation --------------------
 def is_valid_email(email):
@@ -149,7 +147,7 @@ def get_plant_details_from_gemini(plant_name, pot_size):
         st.error("Gemini client not initialized. Please enter a valid API key.")
         return None, None 
 
-    # Define the desired JSON structure for the model's output
+    # Defined the desired JSON structure for the model's output
     schema = types.Schema(
         type=types.Type.OBJECT,
         properties={
@@ -500,7 +498,7 @@ def main():
                     base_qty_str = plant_info["schedule"]["🧴 Water Quantity (Litres per Time)"][0]
                     base_qty_ml = parse_base_quantity_ml(base_qty_str) # Get the base quantity in mL
 
-                    # UPDATED: Run FLS calculation and UNPACK ALL 5 RETURN VALUES
+                    
                     percent_adj, current_temp, final_qty_ml, temp_category, percent_category = calculate_adjusted_water(base_qty_ml)
 
                     new_rows = []
@@ -509,7 +507,7 @@ def main():
                                 "Plant": selected_plant,
                                 "Date": date,
                                 "Time": wtime,
-                                "Water Quantity": base_qty_str, # Keep original AI quantity for reference
+                                "Water Quantity": base_qty_str, 
                                 "Base Qty (mL)": base_qty_ml,
                                 "Temp (°C)": current_temp,
                                 "Adj (%)": percent_adj,
@@ -595,7 +593,7 @@ def main():
                         if reminder_datetime > datetime.now():
                             job_id = f"reminder_{idx}_{plant.replace(' ', '_')}_{reminder_datetime.timestamp()}"
                             scheduler.add_job(send_reminder_email, 'date', run_date=reminder_datetime,
-                                            # UPDATED ARGS: includes the new categories
+                                            
                                             args=[user_email, plant, date_str, time_str, base_qty_str, temp_c, percent_adj, final_qty_ml, temp_category, percent_category], 
                                             id=job_id, 
                                             replace_existing=True)
