@@ -1,5 +1,3 @@
-
-
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta, time
@@ -13,7 +11,7 @@ import json
 
 # -------------------- IMPORT FUZZY LOGIC MODULE --------------------
 # NOTE: This assumes Fuzzy.py (with updated return values) is in the same directory.
-from Fuzzy import calculate_adjusted_water 
+from Fuzzy_copy import calculate_adjusted_water 
 
 # -------------------- NEW GEMINI IMPORTS --------------------
 from google import genai
@@ -24,16 +22,17 @@ from google.genai.errors import APIError
 scheduler = BackgroundScheduler()
 scheduler.start()
 
+# --- Placeholder/Initialization for Gemini Client ---
 client = None
 
-#  send_reminder_email FUNCTION ---
+# --- UPDATED send_reminder_email FUNCTION ---
 
 def send_reminder_email(user_email, plant, date, time_str, base_qty_str, temp_c, percent_adj, final_qty_ml, temp_category, percent_category):
     """
     Send reminder email including Fuzzy Logic calculation details and categories.
     """
     
-    #fuzzy logic variables for the email body
+    # Format the fuzzy logic variables for the email body
     temp_display = f"{temp_c:.1f} °C" if temp_c is not None else "N/A (Fetch Failed)"
     percent_display = f"{percent_adj:+.2f}%"
     final_qty_display = f"{final_qty_ml:.0f} mL"
@@ -43,7 +42,7 @@ def send_reminder_email(user_email, plant, date, time_str, base_qty_str, temp_c,
     percent_cat_display = f"({percent_category})"
     
     try:
-        #GMAIL AND APP PASSWORD
+        # NOTE: REPLACE THESE WITH YOUR ACTUAL GMAIL AND APP PASSWORD
         sender_email = "plantwateringremainder@gmail.com"        
         sender_password = "egbr wiiv xzye mrgo"       # Gmail app password (NOT your regular password)
 
@@ -90,7 +89,7 @@ def send_reminder_email(user_email, plant, date, time_str, base_qty_str, temp_c,
         Remember to check your soil before watering!
         """
         
-        # Used MIMEMultipart to send both HTML and plain text
+        # Use MIMEMultipart to send both HTML and plain text
         from email.mime.multipart import MIMEMultipart
         message = MIMEMultipart("alternative")
         
@@ -99,7 +98,7 @@ def send_reminder_email(user_email, plant, date, time_str, base_qty_str, temp_c,
         message['To'] = user_email
         
         message.attach(MIMEText(plain_body, 'plain'))
-        message.attach(MIMEText(html_body, 'html')) 
+        message.attach(MIMEText(html_body, 'html')) # Attach HTML version
 
         with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
             server.login(sender_email, sender_password)
@@ -109,7 +108,8 @@ def send_reminder_email(user_email, plant, date, time_str, base_qty_str, temp_c,
     except Exception as e:
         print(f"Error sending email: {e}")
 
-
+# Note: You must ensure you use the full import for MIMEMultipart at the top of Gemi.py:
+# from email.mime.multipart import MIMEMultipart
 
 # -------------------- Email Validation --------------------
 def is_valid_email(email):
@@ -147,7 +147,7 @@ def get_plant_details_from_gemini(plant_name, pot_size):
         st.error("Gemini client not initialized. Please enter a valid API key.")
         return None, None 
 
-    # Defined the desired JSON structure for the model's output
+    # Define the desired JSON structure for the model's output
     schema = types.Schema(
         type=types.Type.OBJECT,
         properties={
@@ -245,7 +245,7 @@ def main():
 
     # -------------------- Session State --------------------
     if "watering_schedule" not in st.session_state:
-        # UPDATED: Added Temp Category and Adj Category columns
+        # REVERTED: FLS columns included to support scheduler logic
         st.session_state["watering_schedule"] = pd.DataFrame(columns=[
             "Plant", 
             "Date", 
@@ -498,22 +498,23 @@ def main():
                     base_qty_str = plant_info["schedule"]["🧴 Water Quantity (Litres per Time)"][0]
                     base_qty_ml = parse_base_quantity_ml(base_qty_str) # Get the base quantity in mL
 
-                    
+                    # UPDATED: Run FLS calculation and UNPACK ALL 5 RETURN VALUES
                     percent_adj, current_temp, final_qty_ml, temp_category, percent_category = calculate_adjusted_water(base_qty_ml)
 
                     new_rows = []
                     for date, wtime in zip(selected_dates, watering_times):
+                        # REVERTED: Include all FLS columns as they are required by the scheduler/email function
                         new_rows.append({
                                 "Plant": selected_plant,
                                 "Date": date,
                                 "Time": wtime,
-                                "Water Quantity": base_qty_str, 
+                                "Water Quantity": base_qty_str, # Keep original AI quantity for reference
                                 "Base Qty (mL)": base_qty_ml,
-                                "Temp (°C)": current_temp,
-                                "Adj (%)": percent_adj,
-                                "Final Qty (mL)": final_qty_ml,
-                                "Temp Category": temp_category,     # NEW
-                                "Adj Category": percent_category    # NEW
+                                "Temp (°C)": current_temp,     # INCLUDED
+                                "Adj (%)": percent_adj,        # INCLUDED
+                                "Final Qty (mL)": final_qty_ml, # INCLUDED
+                                "Temp Category": temp_category,     # INCLUDED
+                                "Adj Category": percent_category    # INCLUDED
                             })
                     
                     new_df = pd.DataFrame(new_rows)
@@ -531,9 +532,10 @@ def main():
     if not st.session_state["watering_schedule"].empty:
         st.markdown("---") 
         st.markdown("### 📋 Current Watering Schedule")
-        # Display the full schedule with FLS results, excluding only the Base Qty in mL
-        display_df = st.session_state["watering_schedule"].drop(columns=["Base Qty (mL)"]).drop_duplicates()
-        st.table(display_df) 
+        
+        # Display the full schedule, dropping only the Base Qty (mL) for the Streamlit display
+        display_df_full = st.session_state["watering_schedule"].drop(columns=["Base Qty (mL)"]).drop_duplicates()
+        st.table(display_df_full) 
 
         # -------------------- User Email Input --------------------
         user_email = st.text_input("📧 Enter your email to send full schedule and get automatic reminders:")
@@ -545,6 +547,19 @@ def main():
                 st.error("⚠️ Invalid email format!")
             else:
                 try:
+                    # The DataFrame used for display/scheduling is the full version
+                    full_df = st.session_state["watering_schedule"].drop_duplicates()
+
+                    # 1. Define the complete list of columns to exclude for the EMAIL TABLE
+                    columns_to_exclude = ['Temp Category', 'Adj Category', 'Adj (%)', 'Final Qty (mL)','Temp (°C)', 'Base Qty (mL)'] # Added Base Qty (mL) just in case
+                    
+                    # 2. Create the CLEANED DataFrame for the email HTML table
+                    # This is where the columns are excluded for the user's view
+                    display_df_cleaned = full_df.drop(columns=columns_to_exclude, axis=1)
+
+                    # 3. Use the cleaned DataFrame to generate the HTML table
+                    html_table = display_df_cleaned.to_html(index=False)
+                    
                     # 1️⃣ Send full schedule immediately
                     sender_email = "plantwateringremainder@gmail.com"
                     sender_password = "egbr wiiv xzye mrgo" 
@@ -554,13 +569,12 @@ def main():
                     message['From'] = sender_email
                     message['To'] = user_email
 
-                    html_table = display_df.to_html(index=False)
                     html_content = f"""
                     <html>
                     <body>
-                    <p>Hello! Here is your full watering schedule so far:</p>
+                    <p>Hello! Here is your full watering schedule so far (columns adjusted for clarity):</p>
                     {html_table}
-                    <p>You will also receive automatic email reminders for each scheduled time.</p>
+                    <p>You will also receive automatic email reminders for each scheduled time, which will include the full, environment-adjusted watering quantity.</p>
                     </body>
                     </html>
                     """
@@ -572,16 +586,16 @@ def main():
 
                     st.success("✅ Full schedule sent successfully!")
 
-                    # 2️⃣ Schedule automatic email reminders (MODIFIED to pass FLS results and categories)
-                    for idx, row in st.session_state["watering_schedule"].drop_duplicates().iterrows():
+                    # 2️⃣ Schedule automatic email reminders
+                    for idx, row in full_df.iterrows():
                         
-                        # FLS variables from the stored DataFrame row
+                        # FLS variables are accessed successfully because they are stored in full_df
                         base_qty_str = row['Water Quantity'] 
                         temp_c = row['Temp (°C)']
                         percent_adj = row['Adj (%)']
                         final_qty_ml = row['Final Qty (mL)']
-                        temp_category = row['Temp Category']        # NEW
-                        percent_category = row['Adj Category']      # NEW
+                        temp_category = row['Temp Category']        
+                        percent_category = row['Adj Category']      
                         
                         plant = row['Plant']
                         date_str = row['Date']
@@ -593,7 +607,7 @@ def main():
                         if reminder_datetime > datetime.now():
                             job_id = f"reminder_{idx}_{plant.replace(' ', '_')}_{reminder_datetime.timestamp()}"
                             scheduler.add_job(send_reminder_email, 'date', run_date=reminder_datetime,
-                                            
+                                            # UPDATED ARGS: includes the new categories
                                             args=[user_email, plant, date_str, time_str, base_qty_str, temp_c, percent_adj, final_qty_ml, temp_category, percent_category], 
                                             id=job_id, 
                                             replace_existing=True)
