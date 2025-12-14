@@ -1,4 +1,5 @@
 # Plant Watering Reminder 
+## Steps to run this application
 
 ## Project Structure
 ```text
