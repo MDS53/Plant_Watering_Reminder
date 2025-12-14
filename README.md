@@ -1,4 +1,15 @@
 # Plant Watering Reminder 
+
+## Project Structure
+```text
+Plant_Watering_scheduler/
+│
+├── app.py   #Main application file (entry point)
+├── Fuzzy.py #Fuzzy logic implementation
+├── requirements.txt  #List of required Python libraries. give in markdown code
+
+```
+
 ##  Step 1: Create a Virtual Environment
 
 It is recommended to use a virtual environment to avoid dependency conflicts.
