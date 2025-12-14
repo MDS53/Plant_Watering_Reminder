@@ -8,10 +8,15 @@ Project done by Shruthi mailaram, Mohammad Salman, Priyanka Masina
 ```text
 Plant_Watering_scheduler/
 │
-├── app.py   #Main application file (entry point)
-├── Fuzzy.py #Fuzzy logic implementation
-├── requirements.txt  #List of required Python libraries. give in markdown code
-
+├── app.py                     # Main application file (entry point)
+├── Fuzzy.py                   # Fuzzy logic implementation
+├── requirements.txt           # List of required Python libraries
+├── README.md                  # Project documentation and usage guide
+│
+├── Fuzzy Internal working.pdf # Detailed explanation of fuzzy logic workflow
+├── UI Navigation flow.pdf     # UI screens and navigation flow documentation
+│
+├── env/                       # API Key available here to copy and paste in UI 
 ```
 
 ##  Step 1: Create a Virtual Environment
