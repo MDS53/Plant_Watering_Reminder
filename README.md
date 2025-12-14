@@ -1,5 +1,8 @@
 # Plant Watering Reminder 
+
+Project done by Shruthi mailaram, Mohammad Salman, Priyanka Masina
 ## Steps to run this application
+
 
 ## Project Structure
 ```text
