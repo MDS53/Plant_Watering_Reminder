@@ -14,11 +14,11 @@ Plant_Watering_scheduler/
 ├── README.md                  # Project documentation and usage guide
 │
 ├── Fuzzy Internal working.pdf # Detailed explanation of fuzzy logic workflow
+├── Fuzzy Evaluation.pdf           # Fuzzy evaluation process and rule analysis
 ├── UI Navigation flow.pdf     # UI screens and navigation flow documentation
 │
 ├── env/                       # API Key available here to copy and paste in UI 
 ```
-
 ##  Step 1: Create a Virtual Environment
 
 It is recommended to use a virtual environment to avoid dependency conflicts.
