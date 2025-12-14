@@ -20,19 +20,19 @@ python3 -m venv venv
 ```sh
 source venv/bin/activate
 ```
-## 📦 Step 2: Install Required Libraries
+##  Step 2: Install Required Libraries
 
 All required libraries are listed in the `requirements.txt` file.
 
 ### 📄 List of Libraries
 - Managed via `requirements.txt`
 
-### 📥 Installation Command
+###  Installation Command
 
 ```sh
 pip install -r requirements.txt
 ```
-## 📂 Step 3: Navigate to the Project Directory
+##  Step 3: Navigate to the Project Directory
 
 Make sure your terminal is pointing to the folder containing `app.py`.
 
@@ -42,7 +42,7 @@ Example:
 cd Plant_Watering_scheduler
 ```
 
-## ▶️ Step 4: Run the Application (`app.py`)
+##  Step 4: Run the Application (`app.py`)
 
 This application is built using **Streamlit**, a Python framework for creating interactive web applications.
 
@@ -53,7 +53,7 @@ Running the application will:
 
 ---
 
-### ✅ Recommended Command (All OS)
+###  Recommended Command (All OS)
 
 ```sh
 streamlit run app.py
