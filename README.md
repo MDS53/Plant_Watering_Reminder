@@ -1,4 +1,5 @@
-## 🧪 Step 1: Create a Virtual Environment
+# Plant Watering Reminder 
+##  Step 1: Create a Virtual Environment
 
 It is recommended to use a virtual environment to avoid dependency conflicts.
 
