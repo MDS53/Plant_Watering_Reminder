@@ -11,7 +11,7 @@ import json
 
 # -------------------- IMPORT FUZZY LOGIC MODULE --------------------
 # NOTE: This assumes Fuzzy.py (with updated return values) is in the same directory.
-from Fuzzy_copy import calculate_adjusted_water 
+from Fuzzy import calculate_adjusted_water 
 
 # -------------------- NEW GEMINI IMPORTS --------------------
 from google import genai
