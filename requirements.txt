@@ -1,0 +1,10 @@
+numpy
+scipy
+scikit-fuzzy
+requests
+streamlit
+pandas
+apscheduler
+google-genai
+dnspython
+networkx
