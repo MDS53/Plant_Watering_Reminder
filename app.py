@@ -13,7 +13,7 @@ import json
 # NOTE: This assumes Fuzzy.py (with updated return values) is in the same directory.
 from Fuzzy import calculate_adjusted_water 
 
-# -------------------- NEW GEMINI IMPORTS --------------------
+# -------------------- GEMINI IMPORTS --------------------
 from google import genai
 from google.genai import types 
 from google.genai.errors import APIError
@@ -25,7 +25,7 @@ scheduler.start()
 # --- Placeholder/Initialization for Gemini Client ---
 client = None
 
-# --- UPDATED send_reminder_email FUNCTION ---
+# --- send_reminder_email FUNCTION ---
 
 def send_reminder_email(user_email, plant, date, time_str, base_qty_str, temp_c, percent_adj, final_qty_ml, temp_category, percent_category):
     """
@@ -42,7 +42,7 @@ def send_reminder_email(user_email, plant, date, time_str, base_qty_str, temp_c,
     percent_cat_display = f"({percent_category})"
     
     try:
-        # NOTE: REPLACE THESE WITH YOUR ACTUAL GMAIL AND APP PASSWORD
+        # GMAIL AND APP PASSWORD
         sender_email = "plantwateringremainder@gmail.com"        
         sender_password = "egbr wiiv xzye mrgo"       # Gmail app password (NOT your regular password)
 
@@ -108,8 +108,6 @@ def send_reminder_email(user_email, plant, date, time_str, base_qty_str, temp_c,
     except Exception as e:
         print(f"Error sending email: {e}")
 
-# Note: You must ensure you use the full import for MIMEMultipart at the top of Gemi.py:
-# from email.mime.multipart import MIMEMultipart
 
 # -------------------- Email Validation --------------------
 def is_valid_email(email):
