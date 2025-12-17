@@ -13,19 +13,18 @@ def fetch_current_temperature(location=""):
     Fetches the current temperature from wttr.in.
     :return: Temperature in float (Celsius) or None on failure.
     """
-    url = f"https://wttr.in/{location}?format=%t&0T" 
+    url = f"https://wttr.in/{location}?format=%t" 
     
     try:
         response = requests.get(url, timeout=5) 
         response.raise_for_status()
         raw_temp_str = response.text.strip()
+        # Clean the string (remove +, °C, etc) before passing to float
         match = re.search(r'([-+]?\d+)', raw_temp_str)
         if match:
             return float(match.group(1)) 
-        else:
-            return None
-            
-    except requests.exceptions.RequestException:
+        return None
+    except Exception:
         return None
 
 # --- 1. DEFINE FUZZY LOGIC SYSTEM (FLS) ---
