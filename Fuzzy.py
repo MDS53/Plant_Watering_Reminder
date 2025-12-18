@@ -4,31 +4,25 @@ import numpy as np
 import skfuzzy as fuzz
 from skfuzzy import control as ctrl
 import requests
-import re 
 
-# --- 0. EXTERNAL TEMPERATURE FETCH FUNCTION ---
+# --- 0. UPDATED TEMPERATURE FETCH FUNCTION (OpenWeatherMap) ---
 
-def fetch_current_temperature(location=""):
+def fetch_current_temperature(lat, lon, api_key):
     """
-    Fetches the current temperature from wttr.in.
-    :return: Temperature in float (Celsius) or None on failure.
+    Fetches the current temperature using OpenWeatherMap API.
     """
-    url = f"https://wttr.in/{location}?format=%t" 
-    
+    url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={api_key}&units=metric"
     try:
-        response = requests.get(url, timeout=5) 
-        response.raise_for_status()
-        raw_temp_str = response.text.strip()
-        # Clean the string (remove +, °C, etc) before passing to float
-        match = re.search(r'([-+]?\d+)', raw_temp_str)
-        if match:
-            return float(match.group(1)) 
+        response = requests.get(url, timeout=5).json()
+        if response.get("cod") == 200:
+            return float(response["main"]["temp"])
         return None
     except Exception:
         return None
 
 # --- 1. DEFINE FUZZY LOGIC SYSTEM (FLS) ---
 
+# Antecedent (Input) and Consequent (Output)
 temp = ctrl.Antecedent(np.arange(-10, 41, 1), 'temperature')
 percent_change = ctrl.Consequent(np.arange(-30, 21, 1), 'percent_change')
 
@@ -60,55 +54,48 @@ rule5 = ctrl.Rule(temp['Very_Hot'], percent_change['Large_Increase'])
 watering_ctrl = ctrl.ControlSystem([rule0, rule1, rule2, rule3, rule4, rule5])
 watering_sim = ctrl.ControlSystemSimulation(watering_ctrl)
 
-# --- FLS Calculation Function (UPDATED) ---
+# --- FLS Calculation Function ---
 
-def calculate_adjusted_water(base_quantity_ml):
+def calculate_adjusted_water(base_quantity_ml, current_temp=None):
     """
-    Fetches temperature, runs FLS, and returns all calculation details, 
-    including the dominant fuzzy categories for temperature and adjustment.
-    
-    :param base_quantity_ml: Base water quantity in mL (from Gemini).
-    :return: Tuple (percent_adj, current_temp, final_quantity_ml, temp_category, percent_category) or None.
+    Runs FLS and returns: 
+    (percent_adj, current_temp, final_qty_ml, temp_category, percent_category)
     """
-    current_temp = fetch_current_temperature()
-    
-    # --- 1. Temperature Fetch Fallback ---
+    # Use 25°C (Moderate) as a safe fallback if temperature is missing
     if current_temp is None:
-        # Fallback if temperature fetch fails (return base quantity with 0% adj)
-        return 0.0, None, base_quantity_ml, 'N/A', 'N/A' 
+        current_temp = 25.0
 
-    try:
-        watering_sim.input['temperature'] = current_temp
-        watering_sim.compute()
-        percent_adj = watering_sim.output['percent_change']
-        
-        # Calculate final quantity
-        adj_mL = base_quantity_ml * (percent_adj / 100.0)
-        final_quantity = base_quantity_ml + adj_mL
-        
-        # --- 2. Determine Dominant Linguistic Category for Input (Temperature) ---
-        max_membership_temp = -1.0
-        temp_category = 'Undefined'
-        
-        for name, mf in temp.terms.items():
-            mu = fuzz.interp_membership(temp.universe, mf.mf, current_temp)
-            if mu > max_membership_temp:
-                max_membership_temp = mu
-                temp_category = name
-                
-        # --- 3. Determine Dominant Linguistic Category for Output (Percent Change) ---
-        max_membership_percent = -1.0
-        percent_category = 'Undefined'
-        
-        for name, mf in percent_change.terms.items():
-            mu = fuzz.interp_membership(percent_change.universe, mf.mf, percent_adj)
-            if mu > max_membership_percent:
-                max_membership_percent = mu
-                percent_category = name
-        
-        # --- 4. Return all calculated values and categories ---
-        return percent_adj, current_temp, final_quantity, temp_category, percent_category
-        
-    except (ValueError, KeyError, ZeroDivisionError):
-        # Fallback if FLS computation fails
-        return 0.0, current_temp, base_quantity_ml, 'FLS_Error', 'FLS_Error'
+    # 1. Apply Input to Simulation
+    watering_sim.input['temperature'] = current_temp
+    
+    # 2. Crunch the numbers
+    watering_sim.compute()
+    percent_adj = watering_sim.output['percent_change']
+    
+    # 3. Calculate Final Quantity
+    final_qty_ml = base_quantity_ml * (1 + (percent_adj / 100))
+
+    # 4. Determine Categories (Finding the dominant Fuzzy Set)
+    # Get membership levels for each category at the current temp
+    temp_categories = {
+        'Freezing': fuzz.interp_membership(temp.universe, temp['Freezing'].mf, current_temp),
+        'Very Cold': fuzz.interp_membership(temp.universe, temp['Very_Cold'].mf, current_temp),
+        'Cold': fuzz.interp_membership(temp.universe, temp['Cold'].mf, current_temp),
+        'Moderate': fuzz.interp_membership(temp.universe, temp['Moderate'].mf, current_temp),
+        'Hot': fuzz.interp_membership(temp.universe, temp['Hot'].mf, current_temp),
+        'Very Hot': fuzz.interp_membership(temp.universe, temp['Very_Hot'].mf, current_temp)
+    }
+    temp_category = max(temp_categories, key=temp_categories.get)
+
+    # Get membership levels for adjustment
+    adj_categories = {
+        'Extreme Decrease': fuzz.interp_membership(percent_change.universe, percent_change['Extreme_Decrease'].mf, percent_adj),
+        'Large Decrease': fuzz.interp_membership(percent_change.universe, percent_change['Large_Decrease'].mf, percent_adj),
+        'Decrease': fuzz.interp_membership(percent_change.universe, percent_change['Decrease'].mf, percent_adj),
+        'No Change': fuzz.interp_membership(percent_change.universe, percent_change['No_Change'].mf, percent_adj),
+        'Increase': fuzz.interp_membership(percent_change.universe, percent_change['Increase'].mf, percent_adj),
+        'Large Increase': fuzz.interp_membership(percent_change.universe, percent_change['Large_Increase'].mf, percent_adj)
+    }
+    percent_category = max(adj_categories, key=adj_categories.get)
+
+    return percent_adj, current_temp, final_qty_ml, temp_category, percent_category
