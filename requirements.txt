@@ -8,3 +8,4 @@ apscheduler
 google-genai
 dnspython
 networkx
+streamlit-js-eval
