@@ -5,7 +5,7 @@ import skfuzzy as fuzz
 from skfuzzy import control as ctrl
 import requests
 
-# --- 0. UPDATED TEMPERATURE FETCH FUNCTION (OpenWeatherMap) ---
+# TEMPERATURE FETCH FUNCTION (OpenWeatherMap) ---
 
 def fetch_current_temperature(lat, lon, api_key):
     """
