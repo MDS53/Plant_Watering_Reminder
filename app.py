@@ -8,6 +8,8 @@ import re
 import dns.resolver
 from apscheduler.schedulers.background import BackgroundScheduler
 import json
+import requests
+from streamlit_js_eval import streamlit_js_eval
 
 # -------------------- IMPORT FUZZY LOGIC MODULE --------------------
 # NOTE: This assumes Fuzzy.py (with updated return values) is in the same directory.
@@ -17,6 +19,9 @@ from Fuzzy import calculate_adjusted_water
 from google import genai
 from google.genai import types 
 from google.genai.errors import APIError
+
+# Weatherapp APIKEY
+OWM_API_KEY = "8b65933c05a2cbf560499ed7d8351370"
 
 # -------------------- Scheduler Setup --------------------
 scheduler = BackgroundScheduler()
@@ -44,7 +49,7 @@ def send_reminder_email(user_email, plant, date, time_str, base_qty_str, temp_c,
     try:
         # GMAIL AND APP PASSWORD
         sender_email = "plantwateringremainder@gmail.com"        
-        sender_password = "egbr wiiv xzye mrgo"       # Gmail app password (NOT your regular password)
+        sender_password = "egbr wiiv xzye mrgo"      # Gmail app password (NOT your regular password)
 
         # --- HTML Body (Recommended for better formatting) ---
         html_body = f"""
@@ -334,6 +339,45 @@ def main():
                 ]
             }
         }
+      # --- SIDEBAR: WEATHER & LOCATION ---
+    with st.sidebar:
+        st.title("📍 Location Weather")
+        js_code = """
+        (async () => {
+            return await new Promise((resolve) => {
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => resolve({lat: pos.coords.latitude, lon: pos.coords.longitude}),
+                    (err) => resolve({error: err.message}),
+                    { enableHighAccuracy: false, timeout: 5000 }
+                );
+            });
+        })()
+        """
+        loc = streamlit_js_eval(js_expressions=js_code, key="owm_loc")
+
+        if loc:
+            if "error" in loc:
+                st.error("Enable location access in browser.")
+            else:
+                lat, lon = loc['lat'], loc['lon']
+                url = f"https://api.openweathermap.org/data/2.5/weather?lat={lat}&lon={lon}&appid={OWM_API_KEY}&units=metric"
+                try:
+                    res = requests.get(url).json()
+                    #global temperature = float(res['main']['temp'])
+                    if res.get("cod") == 200:
+                        st.session_state["current_detected_temp"] = float(res['main']['temp'])
+                        
+                        st.success(f"Location: {res['name']}")
+                        st.metric("Detected Temp", f"{res['main']['temp']}°C")
+                        st.image(f"http://openweathermap.org/img/wn/{res['weather'][0]['icon']}@2x.png")
+                    else:
+                        st.warning("Invalid API Key for Weather.")
+                except:
+                    st.error("Weather service unreachable.")
+        else:
+            st.info("Detecting your location...")
+
+    st.title("🌿 Intelligent Plant Watering")
 
     # -------------------- API Key Input and Client Setup Section --------------------
 
@@ -489,42 +533,52 @@ def main():
             st.session_state.watering_times = watering_times
 
             # -------------------- Add Reminder to Schedule --------------------
-            if st.button("✅ Add Reminder to Schedule"):
-                if len(selected_dates) != days_needed:
-                    st.error(f"Please select exactly {days_needed} date(s) to add reminder.")
-                else:
-                    base_qty_str = plant_info["schedule"]["🧴 Water Quantity (Litres per Time)"][0]
-                    base_qty_ml = parse_base_quantity_ml(base_qty_str) # Get the base quantity in mL
+            # -------------------- Add Reminder Logic --------------------
+    if st.session_state.selected_plant != "Select a plant":
+        plant_info = st.session_state["plants_data_"][st.session_state.selected_plant]
+        frequency = st.session_state["plants_data"][st.session_state.selected_plant]["times_per_week"]
+        days_needed = max(1, int(round(frequency)))
 
-                    # UPDATED: Run FLS calculation and UNPACK ALL 5 RETURN VALUES
-                    percent_adj, current_temp, final_qty_ml, temp_category, percent_category = calculate_adjusted_water(base_qty_ml)
+        # -------------------- Add Reminder Logic --------------------
+        if st.button("✅ Add Reminder to Schedule"):
+            if len(st.session_state.selected_dates) != days_needed:
+                st.error(f"Please select exactly {days_needed} date(s).")
+            elif not st.session_state.watering_times:
+                st.error("Please ensure times are selected for each date.")
+            else:
+                base_qty_str = plant_info["schedule"]["🧴 Water Quantity (Litres per Time)"][0]
+                base_qty_ml = parse_base_quantity_ml(base_qty_str)
 
-                    new_rows = []
-                    for date, wtime in zip(selected_dates, watering_times):
-                        # REVERTED: Include all FLS columns as they are required by the scheduler/email function
-                        new_rows.append({
-                                "Plant": selected_plant,
-                                "Date": date,
-                                "Time": wtime,
-                                "Water Quantity": base_qty_str, # Keep original AI quantity for reference
-                                "Base Qty (mL)": base_qty_ml,
-                                "Temp (°C)": current_temp,     # INCLUDED
-                                "Adj (%)": percent_adj,        # INCLUDED
-                                "Final Qty (mL)": final_qty_ml, # INCLUDED
-                                "Temp Category": temp_category,     # INCLUDED
-                                "Adj Category": percent_category    # INCLUDED
-                            })
-                    
-                    new_df = pd.DataFrame(new_rows)
-                    st.session_state["watering_schedule"] = pd.concat([st.session_state["watering_schedule"], new_df], ignore_index=True)
+                # Call Fuzzy Logic
+                p_adj, c_temp, f_qty, t_cat, p_cat = calculate_adjusted_water(
+                    base_qty_ml, 
+                    current_temp=st.session_state["current_detected_temp"]
+                )
 
-                    st.success(f"Reminder added! **FLS Suggestion: {final_qty_ml:.0f} mL** (Temp: {temp_category}, Adj: {percent_category})")
-
-                    # Reset selections
-                    st.session_state.selected_plant = "Select a plant"
-                    st.session_state.selected_dates = []
-                    st.session_state.watering_times = []
-                    st.rerun() 
+                new_rows = []
+                # FIX: Iterate through BOTH dates and times together
+                for date, w_time in zip(st.session_state.selected_dates, st.session_state.watering_times):
+                    new_rows.append({
+                        "Plant": st.session_state.selected_plant, 
+                        "Date": date, 
+                        "Time": w_time,  # FIX: Use the selected time 'w_time' instead of hardcoded "09:00"
+                        "Water Quantity": base_qty_str, 
+                        "Base Qty (mL)": base_qty_ml,
+                        "Temp (°C)": c_temp, 
+                        "Adj (%)": p_adj, 
+                        "Final Qty (mL)": f_qty,
+                        "Temp Category": t_cat, 
+                        "Adj Category": p_cat
+                    })
+                
+                st.session_state["watering_schedule"] = pd.concat([st.session_state["watering_schedule"], pd.DataFrame(new_rows)], ignore_index=True)
+                
+                st.success(f"Reminder added! **FLS Suggestion: {f_qty:.0f} mL** (Temp: {t_cat}, Adj: {p_cat})")
+                
+                # Reset UI state for next entry
+                st.session_state.selected_dates = []
+                st.session_state.watering_times = []
+                st.rerun()
 
     # -------------------- Display Current Schedule --------------------
     if not st.session_state["watering_schedule"].empty:
